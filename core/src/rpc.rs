@@ -250,8 +250,11 @@ impl Client {
             .ok_or_else(|| Error::BadResponse("no bestblockhash".into()))?;
         let height =
             info["blocks"].as_u64().ok_or_else(|| Error::BadResponse("no blocks".into()))? as u32;
+        // Knots 29.4.2 reports header-v2 tips as `difficulty_blake2b` (expected hashes, the
+        // old difficulty times 2^32) and leaves `difficulty` out.
         let difficulty = info["difficulty"]
             .as_f64()
+            .or_else(|| info["difficulty_blake2b"].as_f64().map(|d| d / 4294967296.0))
             .ok_or_else(|| Error::BadResponse("no difficulty".into()))?;
         let chain = Chain::parse(
             info["chain"].as_str().ok_or_else(|| Error::BadResponse("no chain".into()))?,
