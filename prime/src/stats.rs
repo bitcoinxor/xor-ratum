@@ -53,6 +53,25 @@ const RECENT_BLOCKS: usize = 50;
 const HISTORY_INTERVAL_SECS: u64 = 60;
 const HISTORY_CAP: usize = 24 * 60;
 
+/// One identity's workers over the hashrate span, largest first: name, hashrate, last share.
+fn workers_of(
+    identity: &str,
+    by_worker: &HashMap<String, HashMap<String, (u128, u64)>>,
+) -> Vec<serde_json::Value> {
+    let Some(m) = by_worker.get(identity) else { return Vec::new() };
+    let mut v: Vec<(&String, &(u128, u64))> = m.iter().collect();
+    v.sort_by(|a, b| b.1 .0.cmp(&a.1 .0).then_with(|| a.0.cmp(b.0)));
+    v.into_iter()
+        .map(|(name, (work, last))| {
+            serde_json::json!({
+                "name": name,
+                "hashrate_hs": hashes_per_second(*work, HASHRATE_SPAN_SECS),
+                "last_share": last,
+            })
+        })
+        .collect()
+}
+
 /// Append one sample and discard the oldest beyond the cap.
 fn push_sample(history: &mut VecDeque<(u64, f64)>, at: u64, hs: f64) {
     history.push_back((at, hs));
@@ -147,7 +166,7 @@ fn snapshot(server: &Server, history: &Mutex<VecDeque<(u64, f64)>>) -> String {
     let operator_fee = coinbase_value.map_or(0, |v| server.payout.fee_on(v));
 
     let hashrate_cutoff = unix_now().saturating_sub(HASHRATE_SPAN_SECS);
-    let (total_work, target_work, shares, work_by_identity, tags, split, owed, recent, blocks) = {
+    let (total_work, target_work, shares, work_by_identity, tags, split, owed, recent, blocks, by_worker) = {
         let l = lock(&server.ledger);
         (
             l.total_work(),
@@ -159,6 +178,7 @@ fn snapshot(server: &Server, history: &Mutex<VecDeque<(u64, f64)>>) -> String {
             l.owed().to_vec(),
             l.work_since(hashrate_cutoff),
             l.blocks().to_vec(),
+            l.work_since_by_worker(hashrate_cutoff),
         )
     };
     let payout_sats: HashMap<String, u64> = split.into_iter().collect();
@@ -263,6 +283,10 @@ fn snapshot(server: &Server, history: &Mutex<VecDeque<(u64, f64)>>) -> String {
                 "unpayable_reason": unpayable_reason,
                 // The gateway tag the identity's newest share in the window came through.
                 "tag": tags.get(identity).map_or("", String::as_str),
+                // The identity's rigs, by the worker name after the dot in the username the
+                // gateway sent (`address.worker`), largest first, over the same span as
+                // `hashrate_hs`. Shares whose username had no worker name are the "" entry.
+                "workers": workers_of(identity, &by_worker),
             })
         })
         .collect();

@@ -18,8 +18,8 @@ fn now() -> u64 {
 fn seed_alice_and_bob(dir: &TempDir) {
     let (mut l, _) = Ledger::open(&dir.join("regtest.redb"), u128::MAX, None, None)
         .expect("open the seed ledger");
-    l.record(now(), "alice", 3, &[0x11; 32], "").unwrap();
-    l.record(now(), "bob", 1, &[0x22; 32], "").unwrap();
+    l.record(now(), "alice", "", 3, &[0x11; 32], "").unwrap();
+    l.record(now(), "bob", "", 1, &[0x22; 32], "").unwrap();
 }
 
 /// The address the pool logs the interface as listening on, e.g. `127.0.0.1:41007`.
@@ -101,6 +101,9 @@ fn the_stats_interface_serves_a_json_snapshot_and_a_page() {
     // Read back from the ledger and not resolved since: the snapshot reads the resolver cache
     // and does not call the node itself, so it reports neither payable nor unpayable.
     assert!(alice["payable"].is_null(), "an identity the pool has not resolved is unknown");
+    // Per-rig figures come from shares credited since the pool started; shares replayed
+    // from the ledger at startup carry no worker name, so the list is present but empty.
+    assert!(alice["workers"].as_array().expect("a workers array").is_empty());
 
     // The page.
     let (code, body) = get(&format!("http://{addr}/"));

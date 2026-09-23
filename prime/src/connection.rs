@@ -1202,6 +1202,7 @@ impl Connection<'_> {
             if let Err(e) = l.record(
                 now,
                 &identity,
+                ledger::worker_of(&s.username),
                 a.work.difficulty,
                 &a.work.block_hash,
                 &a.work.tag_secondary,

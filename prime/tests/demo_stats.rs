@@ -49,7 +49,7 @@ fn seed(dir: &TempDir) {
             let at = start + u64::from(i) * span / u64::from(count);
             let mut hash = [0u8; 32];
             hash[..4].copy_from_slice(&i.to_le_bytes());
-            l.record(at, identity, diff, &hash, tag).expect("record share");
+            l.record(at, identity, "", diff, &hash, tag).expect("record share");
             i += 1;
         }
     }
