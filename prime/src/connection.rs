@@ -1217,7 +1217,7 @@ impl Connection<'_> {
             }
             let removed = l.take_removed();
             if removed != 0 {
-                info!(
+                debug!(
                     "[{peer}]      ledger retention removed {removed} \
                      share(s) past --ledger-keep"
                 );
