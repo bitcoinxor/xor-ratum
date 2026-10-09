@@ -279,6 +279,10 @@ impl Connection {
             "mining.authorize" => self.on_authorize(&id, params)?,
             "mining.configure" => self.on_configure(&id, params)?,
             "mining.submit" => self.on_submit(&id, params)?,
+            // Proxies such as MiningRigRentals ask for extranonce updates and treat a
+            // "Method not found" reply as a dead pool. Each connection owns its extranonce1
+            // for its whole life here, so the subscription never has to send anything.
+            "mining.extranonce.subscribe" => self.reply_result(&id, Value::Bool(true))?,
             _ => self.reply_error(&id, METHOD_NOT_FOUND)?,
         }
         Ok(())
@@ -666,6 +670,16 @@ mod tests {
         std::thread::sleep(Duration::from_millis(20));
         c.writer.write_all(b"thorize\",\"params\":[\"worker\"]}\n").unwrap();
         assert_eq!(c.line("the reply to the split request")["id"], 3);
+    }
+
+    #[test]
+    fn extranonce_subscribe_is_acknowledged() {
+        let mut c = Client::connect();
+        c.send(r#"{"id":3,"method":"mining.extranonce.subscribe","params":[]}"#);
+        let reply = c.line("extranonce reply");
+        assert_eq!(reply["id"], 3);
+        assert_eq!(reply["result"], true);
+        assert!(reply["error"].is_null());
     }
 
     #[test]
